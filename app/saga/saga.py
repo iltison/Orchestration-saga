@@ -1,40 +1,56 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from enum import Enum
 
-class Order:
+class OrderState(Enum):
+    Availability = 'Availability'
+    Payment = 'Payment'
+    Delivery = 'Delivery'
+
+class SAGA:
     _state = None
 
-    def __init__(self, state:State) -> None:
-        self.set_state(state)
+    def set_state(self, state: OrderState) -> None:
+        if state == OrderState.Availability:
+            self._state = AvailabilityOrderState()
+        elif state == OrderState.Payment:
+            self._state = PaymentOrderState()
+        elif state == OrderState.Delivery:
+            self._state = DeliveryOrderState()
 
-    def set_state(self, state:State) -> None:
-        print(f"Context: Transitioning to {type(state).__name__}")
-        self._state = state
+        print(f"Context: Transitioning to {type(self._state).__name__}")
         self._state.item = self
 
-    def accept(self):
-        self._state.accept()
+    def get_state(self):
+        return self._state
+
 
 class State(ABC):
     @abstractmethod
     def accept(self) -> None:
         pass
 
+
 class AvailabilityOrderState(State):
     def accept(self):
         print("Товар в наличии")
-        self.item.set_state(PaymentOrderState())
+        self.item.set_state(OrderState.Payment)
+
 
 class PaymentOrderState(State):
     def accept(self):
         print("Товар оплачен")
-        self.item.set_state(DeliveryOrderState())
+        self.item.set_state(OrderState.Delivery)
+
 
 class DeliveryOrderState(State):
     def accept(self):
         print("Товар отправлен")
 
-item = Order(AvailabilityOrderState())
-item.accept()
-item.accept()
-item.accept()
+def main():
+    item = SAGA()
+    item.set_state(OrderState.Availability)
+    item.get_state().accept()
+    item.get_state().accept()
+    item.get_state().accept()
+main()
