@@ -1,6 +1,6 @@
 import pika
 import uuid
-
+import json
 
 class RpcClient(object):
 
@@ -24,7 +24,7 @@ class RpcClient(object):
 
     def on_response(self, ch, method, props, body):
         if self.corr_id == props.correlation_id:
-            self.response = body
+            self.response = json.loads(body.decode('utf8'))
 
     def call(self, n):
         if not self.connection:
@@ -41,4 +41,4 @@ class RpcClient(object):
             ),
             body=str(n))
         self.connection.process_data_events(time_limit=None)
-        return str(self.response,'utf-8')
+        return self.response

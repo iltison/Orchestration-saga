@@ -18,7 +18,7 @@ class BookEntity:
         return {'id':self.id,'name':self.name}
 
 class OrderState(Enum):
-    Availability = 'Availability'
+    Available = 'Available'
     Payment = 'Payment'
     Delivery = 'Delivery'
     Cancel = 'Cancel'
@@ -29,7 +29,7 @@ class SAGA:
         self.amq = RpcClient()
         self.amq.connect()
 
-        self.state = OrderState.Availability
+        self.state = OrderState.Available
 
     @property
     def state(self) -> State:
@@ -37,8 +37,8 @@ class SAGA:
 
     @state.setter
     def state(self, state: OrderState) -> None:
-        if state == OrderState.Availability:
-            self._state = AvailabilityOrderState()
+        if state == OrderState.Available:
+            self._state = AvailableOrderState()
         elif state == OrderState.Payment:
             self._state = PaymentOrderState()
         elif state == OrderState.Delivery:
@@ -58,12 +58,11 @@ class State(ABC):
         # TODO: отправка сообщения в rmq + проверка
         pass
 
-
-class AvailabilityOrderState(State):
+class AvailableOrderState(State):
     saga=None
     def accept(self) -> BookEntity:
-        res = self.saga.amq.call('Availability')
-        if res == 'True':
+        res = self.saga.amq.call('Availability')['data']['available']
+        if res:
             print("Товар в наличии")
             self.saga.state = OrderState.Payment
         else:
@@ -73,8 +72,8 @@ class AvailabilityOrderState(State):
 class PaymentOrderState(State):
     saga = None
     def accept(self) -> BookEntity:
-        res = bool(self.saga.amq.call('Delivery'))
-        if res == 'True':
+        res = self.saga.amq.call('Delivery')['data']['available']
+        if res:
             print("Товар оплачен")
             self.saga.state = OrderState.Delivery
         else:
@@ -89,6 +88,7 @@ class DeliveryOrderState(State):
         return self.saga.book
 
 class CancelOrderState(State):
+    saga = None
     def accept(self) -> None:
         print('Отмена!')
 
