@@ -4,7 +4,7 @@ import uuid
 
 class RpcClient(object):
 
-    def __init__(self):
+    def connect(self):
         # 'amqp://guest:guest@localhost:5672/'
         self.connection = pika.BlockingConnection(
                      pika.ConnectionParameters(host='localhost'))
@@ -27,6 +27,8 @@ class RpcClient(object):
             self.response = body
 
     def call(self, n):
+        if not self.connection:
+            self.connect()
         self.response = None
         self.corr_id = str(uuid.uuid4())
 

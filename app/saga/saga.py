@@ -24,12 +24,19 @@ class OrderState(Enum):
     Cancel = 'Cancel'
 
 class SAGA:
-    _state = None
-    def __init__(self, book:BookEntity):
+    def __init__(self, book:BookEntity) -> None:
         self.book = book
         self.amq = RpcClient()
+        self.amq.connect()
 
-    def set_state(self, state: OrderState) -> None:
+        self.state = OrderState.Availability
+
+    @property
+    def state(self) -> State:
+        return self._state
+
+    @state.setter
+    def state(self, state: OrderState) -> None:
         if state == OrderState.Availability:
             self._state = AvailabilityOrderState()
         elif state == OrderState.Payment:
@@ -42,9 +49,8 @@ class SAGA:
         self._state.saga = self
         self.book.update_order_status(state)
 
-    def get_state(self):
-        return self._state
-
+    def accept(self) -> None:
+        self._state.accept()
 
 class State(ABC):
     @abstractmethod
@@ -53,43 +59,41 @@ class State(ABC):
         pass
 
 
-class AvailabilityOrderState(State) :
+class AvailabilityOrderState(State):
+    saga=None
     def accept(self) -> BookEntity:
-        print("Товар в наличии")
-        print(self.saga.book.get_info())
-        print(self.saga.book.status)
         res = self.saga.amq.call('Availability')
         if res == 'True':
-            self.saga.set_state(OrderState.Payment)
+            print("Товар в наличии")
+            self.saga.state = OrderState.Payment
         else:
-            self.saga.set_state(OrderState.Cancel)
-        return self.saga.get_state().accept()
+            self.saga.state = OrderState.Cancel
+        return self.saga.accept()
 
 class PaymentOrderState(State):
+    saga = None
     def accept(self) -> BookEntity:
-        print("Товар оплачен")
-        print(self.saga.book.status)
         res = bool(self.saga.amq.call('Delivery'))
         if res == 'True':
-            self.saga.set_state(OrderState.Delivery)
+            print("Товар оплачен")
+            self.saga.state = OrderState.Delivery
         else:
-            self.saga.set_state(OrderState.Cancel)
-        return self.saga.get_state().accept()
+            self.saga.state = OrderState.Cancel
+        return self.saga.accept()
 
 
 class DeliveryOrderState(State):
+    saga = None
     def accept(self) -> BookEntity:
         print("Товар отправлен")
-        print(self.saga.book.status)
         return self.saga.book
 
 class CancelOrderState(State):
-    def accept(self) -> BookEntity:
+    def accept(self) -> None:
         print('Отмена!')
 
 def main():
     item = SAGA(BookEntity('Hobbit',2))
-    item.set_state(OrderState('Availability'))
-    item.get_state().accept()
+    item.accept()
 
 main()
