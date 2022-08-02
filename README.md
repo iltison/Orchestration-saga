@@ -1,7 +1,7 @@
 Run 
 
 service:  
-python available_order.py
+python -m microservices.available_order
 
 saga:  
-python saga.py
+python -m app.saga.saga
