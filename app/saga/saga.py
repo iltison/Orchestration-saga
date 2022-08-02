@@ -3,25 +3,39 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from app.RPC.rpc import RpcClient
 
-class BookEntity:
-    # TODO: работа с бд
-    def __init__(self, name:str, id:int):
-        self.status = None
-        self.name = name
-        self.id = id
-
-    def update_order_status(self, status: OrderState):
-        self.status = status
-        print(f'Статус обновлен! {status}')
-
-    def get_info(self):
-        return {'id':self.id,'name':self.name}
-
 class OrderState(Enum):
     Available = 'Available'
     Payment = 'Payment'
     Delivery = 'Delivery'
     Cancel = 'Cancel'
+
+# class RpcClient:
+#     def connect(self):
+#         pass
+#     def call(self, n):
+#         if n == 'available':
+#             return {"data":{'id_book':1,'available':True}}
+#         return {"data": {'id_book': 1, 'available': True}}
+
+class Repo:
+    def add(self, book:BookEntity):
+        print(f'Book created {book}')
+
+    def remove(self):
+        pass
+
+    def get_by_idx(self):
+        pass
+
+    def update_state(self, book:BookEntity):
+        print(f'Status updated {book.status}')
+
+class BookEntity:
+    def __init__(self, name:str, id:int):
+        self.status = OrderState.Available
+        self.name = name
+        self.id = id
+
 
 class SAGA:
     def __init__(self, book:BookEntity) -> None:
@@ -47,53 +61,79 @@ class SAGA:
             self._state = CancelOrderState()
         print(f"\nContext: Transitioning to {type(self._state).__name__}")
         self._state.saga = self
-        self.book.update_order_status(state)
+        self.book.status = state
 
-    def accept(self) -> None:
-        self._state.accept()
+    def accept(self) -> BookEntity:
+        return self._state.accept()
+
+    def cancel(self) -> BookEntity:
+        return self._state.cancel()
 
 class State(ABC):
     @abstractmethod
     def accept(self) -> BookEntity:
-        # TODO: отправка сообщения в rmq + проверка
+        pass
+
+    def cancel(self):
         pass
 
 class AvailableOrderState(State):
     saga=None
     def accept(self) -> BookEntity:
-        res = self.saga.amq.call('Availability')['data']['available']
+        res = self.saga.amq.call('available')['data']['available']
         if res:
-            print("Товар в наличии")
             self.saga.state = OrderState.Payment
         else:
             self.saga.state = OrderState.Cancel
         return self.saga.accept()
 
+    def cancel(self) -> BookEntity:
+        self.saga.state = OrderState.Cancel
+        return self.saga.book
+
 class PaymentOrderState(State):
     saga = None
-    def accept(self) -> BookEntity:
+    def accept(self):
         res = self.saga.amq.call('Delivery')['data']['available']
         if res:
-            print("Товар оплачен")
             self.saga.state = OrderState.Delivery
         else:
             self.saga.state = OrderState.Cancel
         return self.saga.accept()
 
+    def cancel(self) -> BookEntity:
+        self.saga.state = OrderState.Cancel
+        return self.saga.book
 
 class DeliveryOrderState(State):
     saga = None
     def accept(self) -> BookEntity:
-        print("Товар отправлен")
+        return self.saga.book
+
+    def cancel(self) -> BookEntity:
+        self.saga.state = OrderState.Cancel
         return self.saga.book
 
 class CancelOrderState(State):
     saga = None
     def accept(self) -> None:
-        print('Отмена!')
+        print('Cancel!')
+        return self.saga.book
+
+    def cancel(self) -> BookEntity:
+        pass
+
 
 def main():
-    item = SAGA(BookEntity('Hobbit',2))
+    repo = Repo()
+    book = BookEntity('Hobbit',2)
+    repo.add(book)
+    print(book.status)
+    item = SAGA(book)
     item.accept()
+    print(book.status)
+    Repo().update_state(book)
 
-main()
+
+if __name__ == "__main__":
+    main()

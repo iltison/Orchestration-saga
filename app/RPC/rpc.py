@@ -34,7 +34,7 @@ class RpcClient(object):
 
         self.channel.basic_publish(
             exchange='',
-            routing_key='availability',
+            routing_key='available',
             properties=pika.BasicProperties(
                 reply_to=self.callback_queue,
                 correlation_id=self.corr_id,
