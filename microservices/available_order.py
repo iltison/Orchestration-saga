@@ -6,10 +6,10 @@ connection = pika.BlockingConnection(
 
 channel = connection.channel()
 
-channel.queue_declare(queue='availability')
+channel.queue_declare(queue='available')
 
 def logic(n):
-    if n == 'Availability':
+    if n == 'available':
         return {"data":{'id_book':1,'available':True}}
     return {"data": {'id_book': 1, 'available': False}}
 
@@ -26,7 +26,7 @@ def on_request(ch, method, props, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 channel.basic_qos(prefetch_count=1)
-channel.basic_consume(queue='availability', on_message_callback=on_request)
+channel.basic_consume(queue='available', on_message_callback=on_request)
 
 print(" [x] Awaiting RPC requests")
 channel.start_consuming()
